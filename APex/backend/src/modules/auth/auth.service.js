@@ -1,11 +1,12 @@
 import bcrypt from "bcrypt"
-import prisma from  "../../config/prisma.js"
+import { prisma } from "../../config/prisma.js";
 
-async function register({username, gmail, password}){
+async function register({name, email, password}){
     const hashearPassword = await bcrypt.hash(password, 10)
+    console.log(Object.keys(prisma));
     try{
-       const user = prisma.user.create({
-            data: {username, gmail, password: hashearPassword}
+       const user = await prisma.user.create({
+            data: {name, email, password: hashearPassword}
         })
         const {password: _, ...userSinPassword} = user
         return userSinPassword
@@ -19,8 +20,8 @@ async function register({username, gmail, password}){
 }
 
 async function login({email, password}){
-    const user = await prisma.email.findUnique(
-        { where: email }
+    const user = await prisma.user.findUnique(
+        { where: { email } }
     ) 
     if(!email || !user.password){
         throw new Error("Credenciales inválidas");
