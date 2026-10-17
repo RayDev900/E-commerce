@@ -1,5 +1,6 @@
 import authServices from "./auth.service.js"
 
+
 const registerController = async (req, res) => {
     try{
       const newUser = await authServices.register(req.body)
@@ -21,4 +22,4 @@ const loginController = async (req, res) => {
     }
 }
 
-export default { registerController, loginController }
+export { registerController, loginController }

@@ -35,4 +35,4 @@ async function login({email, password}){
     return userSinPassword;
 }
 
-export { register, login }
+export default { register, login }
