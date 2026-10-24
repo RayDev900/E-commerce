@@ -1,24 +1,24 @@
 import express from "express";
 import dotenv from "dotenv";
-import authRouter from "./modules/auth/auth.routes.js";
-import { authenticate } from "./middleware/auth.middleware.js";
+import cookieParser from "cookie-parser";
+import { authRouter } from "./modules/auth/auth.routes.js";
+import { authenticate } from "./middleware/authenticate.js";
+import { authorize } from "./middleware/authorize.js";
 
+dotenv.config();
 
 const app = express();
-dotenv.config()
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use('/api/auth', authRouter);
+app.use(cookieParser());
 
-app.get('/', (req, res)=>{
-    res.send('Hello World');
-})
+app.use("/api/auth", authRouter);
 
-app.get("/me", authenticate, (req, res) => {
-    res.json(req.user);
+app.get("/", (req, res) => {
+  res.send("Hello World");
 });
 
-app.listen(PORT, ()=>{
-    console.log(`Server is running on port http://localhost:${PORT}`);
-})
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});

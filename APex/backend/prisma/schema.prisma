@@ -42,6 +42,7 @@ model User {
   reviews        Review[]
   statusChanges  OrderStatusHistory[]
   stockMovements StockMovement[]
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
@@ -371,4 +372,15 @@ model Review {
   @@unique([userId, productId])
   @@index([productId])
   @@map("reviews")
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
 }
