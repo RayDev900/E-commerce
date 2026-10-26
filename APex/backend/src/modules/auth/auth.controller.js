@@ -1,4 +1,15 @@
+import passport from "passport";
 import * as authServices from "./auth.service.js";
+
+const CLIENT_URL = process.env.CLIENT_URL;
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: "/",
+};
 
 export const registerController = async (req, res) => {
   try {
@@ -21,13 +32,7 @@ export const loginController = async (req, res) => {
       req.body
     );
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/",
-    });
+    res.cookie("refreshToken", refreshToken, cookieOptions);
 
     return res.status(200).json({
       message: "usuario logueado exitosamente",
@@ -57,14 +62,35 @@ export const refreshController = async (req, res) => {
 export const logoutController = async (req, res) => {
   await authServices.logoutService(req.cookies.refreshToken);
 
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-  });
+  res.clearCookie("refreshToken", cookieOptions);
 
   return res.status(200).json({
     message: "Sesión cerrada",
   });
 };
+
+const makeOAuthCallback = (strategyName) => {
+  return async (req, res, next) => {
+    passport.authenticate(strategyName, { session: false }, async (err, user) => {
+      if (err) {
+        return res.redirect(
+          `${CLIENT_URL}/login?error=${encodeURIComponent(err.message || "error")}`
+        );
+      }
+      if (!user) {
+        return res.redirect(`${CLIENT_URL}/login?error=auth_failed`);
+      }
+      try {
+        const { refreshToken } = await authServices.createSession(user);
+
+        res.cookie("refreshToken", refreshToken, cookieOptions);
+
+        return res.redirect(`${CLIENT_URL}/auth/callback`);
+      } catch {
+        return res.redirect(`${CLIENT_URL}/login?error=session_error`);
+      }
+    })(req, res, next);
+  };
+};
+
+export const googleCallbackController = makeOAuthCallback("google");

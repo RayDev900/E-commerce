@@ -8,7 +8,6 @@ import {
 } from "./token.service.js";
 
 async function register({ name, email, password, role }) {
-  // El rol se fuerza a CUSTOMER; se ignora cualquier role que venga en el body
   const hashedPassword = await bcrypt.hash(password, 10);
   try {
     const user = await prisma.user.create({
@@ -30,6 +29,19 @@ async function register({ name, email, password, role }) {
   }
 }
 
+async function createSession(user) {
+  const accessToken = generateAccessToken({ id: user.id, role: user.role });
+  const refreshToken = generateRefreshToken(user);
+  const tokenHash = hashToken(refreshToken);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await prisma.refreshToken.create({
+    data: { tokenHash, userId: user.id, expiresAt },
+  });
+
+  return { accessToken, refreshToken };
+}
+
 async function login({ email, password }) {
   const user = await prisma.user.findUnique({
     where: { email },
@@ -44,17 +56,40 @@ async function login({ email, password }) {
     throw new Error("Credenciales inválidas");
   }
 
-  const accessToken = generateAccessToken({ id: user.id, role: user.role });
-  const refreshToken = generateRefreshToken(user);
-  const tokenHash = hashToken(refreshToken);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const session = await createSession(user);
+  const { password: _, ...userSinPassword } = user;
+  return { user: userSinPassword, ...session };
+}
 
-  await prisma.refreshToken.create({
-    data: { tokenHash, userId: user.id, expiresAt },
+async function findOrCreateOAuthUser({ provider, providerId, email, name }) {
+  let user = await prisma.user.findFirst({
+    where: { provider, providerId },
   });
 
-  const { password: _, ...userSinPassword } = user;
-  return { user: userSinPassword, accessToken, refreshToken };
+  if (user) {
+    return user;
+  }
+
+  const existingByEmail = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (existingByEmail) {
+    throw new Error("EMAIL_EXISTS");
+  }
+
+  user = await prisma.user.create({
+    data: {
+      email,
+      name,
+      password: null,
+      role: "CUSTOMER",
+      provider,
+      providerId,
+    },
+  });
+
+  return user;
 }
 
 async function refreshTokenService(refreshTokenString) {
@@ -95,4 +130,11 @@ async function logoutService(refreshTokenString) {
   await prisma.refreshToken.deleteMany({ where: { tokenHash } }).catch(() => {});
 }
 
-export { register, login, refreshTokenService, logoutService };
+export {
+  register,
+  login,
+  createSession,
+  findOrCreateOAuthUser,
+  refreshTokenService,
+  logoutService,
+};
